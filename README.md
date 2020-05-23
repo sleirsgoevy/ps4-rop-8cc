@@ -60,3 +60,4 @@ This is no speed demon. `8cc` compiles the C code to a stack machine, and is is 
 * The constant-parsing code stores constants as `int` internally. This means that 64-bit constants won't work.
 * 64-bit integer comparison is always signed.
 * Arithmetic shift right is not supported (yet).
+* The generated ROP is reentrant but not thread-safe. That is, one ROP function can only be called on a single thread. This does not apply to rop-to-native calls.
