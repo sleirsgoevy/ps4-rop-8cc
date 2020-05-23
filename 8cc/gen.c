@@ -39,11 +39,11 @@ static void emit_data(Node *v, int off, int depth);
 
 #define assert_float() assert(0 && "float")
 
-#ifdef __eir__
+//#ifdef __eir__
 #define MOD24(x) x
-#else
-#define MOD24(x) (x & 0xffffff)
-#endif
+//#else
+//#define MOD24(x) (x & 0xffffff)
+//#endif
 
 #ifdef __GNUC__
 #define SAVE                                                            \
@@ -120,17 +120,15 @@ static void emit_nostack(char *fmt, ...) {
 static void push(char *reg) {
     SAVE;
     assert(strcmp(reg, "D"));
-    emit("mov D, SP");
-    emit("add D, -1");
-    emit("store %s, D", reg);
-    emit("mov SP, D");
+    emit("sub SP, 8");
+    emit("store64 %s, SP", reg);
     stackpos += 1;
 }
 
 static void pop(char *reg) {
     SAVE;
-    emit("load %s, SP", reg);
-    emit("add SP, 1", reg);
+    emit("load64 %s, SP", reg);
+    emit("sub SP, -8", reg);
     stackpos -= 1;
     assert(stackpos >= 0);
 }
@@ -176,13 +174,17 @@ static void emit_gload(Type *ty, char *label, int off) {
     emit("mov B, %s", label);
     if (off)
         emit("add B, %d", MOD24(off));
-    emit("load A, B");
+    emit("load%d A, B", ty->size*8);
 #if 0
     maybe_emit_bitshift_load(ty);
 #endif
 }
 
 static void emit_intcast(Type *ty) {
+    if(ty->usig)
+        emit("crop%d A", 8*ty->size);
+    else
+        emit("icrop%d A", 8*ty->size);
 }
 
 static void emit_toint(Type *ty) {
@@ -207,7 +209,7 @@ static void emit_lload(Type *ty, char *base, int off) {
         emit("mov B, %s", base);
         if (off)
             emit("add B, %d", MOD24(off));
-        emit("load A, B");
+        emit("load%d A, B", ty->size*8);
     }
 }
 
@@ -229,7 +231,7 @@ static void emit_gsave(char *varname, Type *ty, int off) {
     emit("mov B, %s", varname);
     if (off)
         emit("add B, %d", MOD24(off));
-    emit("store A, B");
+    emit("store%d A, B", ty->size*8);
 }
 
 static void emit_lsave(Type *ty, int off) {
@@ -242,19 +244,16 @@ static void emit_lsave(Type *ty, int off) {
         emit("mov B, BP");
         if (off)
             emit("add B, %d", MOD24(off));
-        emit("store A, B");
+        emit("store%d A, B", ty->size*8);
     }
 }
 
 static void do_emit_assign_deref(Type *ty, int off) {
     SAVE;
-    emit("mov C, A");
-    emit("load A, SP");
-    emit("mov B, A");
-    emit("mov A, C");
+    emit("load64 B, SP");
     if (off)
         emit("add A, %d", MOD24(off));
-    emit("store B, A");
+    emit("store%d B, A", ty->size*8);
     pop("A");
 }
 
@@ -276,14 +275,8 @@ static void emit_pointer_arith(char kind, Node *left, Node *right) {
 
     if (left->ty->ptr->size == 2)
         emit("add A, A");
-    if (left->ty->ptr->size > 2) {
-        push("A");
-        emit("mov A, %d", left->ty->ptr->size);
-        push("A");
-        emit_call_builtin("__builtin_mul");
-        emit("add SP, 2");
-        stackpos -= 3;
-    }
+    if (left->ty->ptr->size > 2)
+        emit("mul A, %d", left->ty->ptr->size);
 
     emit("mov B, A");
     pop("A");
@@ -292,10 +285,7 @@ static void emit_pointer_arith(char kind, Node *left, Node *right) {
     case '-': emit("sub A, B"); break;
     default: error("invalid operator '%d'", kind);
     }
-    emit("mov C, A");
-    pop("A");
-    emit("mov B, A");
-    emit("mov A, C");
+    pop("B");
 }
 
 static void emit_zero_filler(int start, int end) {
@@ -303,7 +293,7 @@ static void emit_zero_filler(int start, int end) {
     emit("mov A, 0");
     emit("mov B, SP");
     for (; start != end; start++) {
-        emit("store A, B");
+        emit("store8 A, B");
         emit("add B, 1");
     }
 }
@@ -390,8 +380,10 @@ static void emit_comp(char *inst, Node *node) {
         assert_float();
     } else {
         emit_expr(node->left);
+        emit_intcast(node->left->ty);
         push("A");
         emit_expr(node->right);
+        emit_intcast(node->right->ty);
         emit("mov B, A");
         pop("A");
     }
@@ -413,28 +405,45 @@ static void emit_binop_int_arith(Node *node) {
             emit("sub A, B");
             break;
         case '*':
+            emit("mul A, B");
+            break;
         case '/':
+        {
+            const char* sn;
+            if(node->left->ty->usig)
+                sn = "";
+            else
+                sn = "i";
+            emit("%scrop%d A", sn, 8*node->left->ty->size);
+            emit("%scrop%d B", sn, 8*node->right->ty->size);
+            emit("%sdiv A, B", sn);
+            break;
+        }
         case '%':
+        {
+            const char* sn;
+            if(node->left->ty->usig)
+                sn = "";
+            else
+                sn = "i";
+            emit("%scrop%d A", sn, 8*node->left->ty->size);
+            emit("%scrop%d B", sn, 8*node->right->ty->size);
+            emit("%smod A, B", sn);
+            break;
+        }
         case '^':
+            emit("xor A, B");
+            break;
         case OP_SAL:
+            emit("shl A, B");
+            break;
         case OP_SAR:
+            emit("icrop%d A", 8*node->left->ty->size);
+            emit("sar A, B");
+            break;
         case OP_SHR:
-            push("B");
-            push("A");
-            if (node->kind == '*')
-                emit_call_builtin("__builtin_mul");
-            else if (node->kind == '/')
-                emit_call_builtin("__builtin_div");
-            else if (node->kind == '%')
-                emit_call_builtin("__builtin_mod");
-            else if (node->kind == '^')
-                emit_call_builtin("__builtin_xor");
-            else if (node->kind == OP_SAL)
-                emit_call_builtin("__builtin_shl");
-            else if (node->kind == OP_SAR || node->kind == OP_SHR)
-                emit_call_builtin("__builtin_shr");
-            emit("add SP, 2");
-            stackpos -= 3;
+            emit("crop%d A", 8*node->left->ty->size);
+            emit("shr A, B");
             break;
         default: error("invalid operator '%d'", node->kind);
     }
@@ -466,16 +475,16 @@ static void emit_load_convert(Type *to, Type *from) {
 static void emit_ret() {
     SAVE;
     emit_nostack("#{pop:%s}", current_func_name);
-    if (is_main) {
+    /*if (is_main) {
         emit("exit");
-    } else {
+    } else {*/
         emit("mov SP, BP");
         pop("A");
         emit("mov BP, A");
         pop("A");
         emit("jmp A");
         stackpos += 2;
-    }
+    //}
 }
 
 static void emit_binop(Node *node) {
@@ -513,7 +522,7 @@ static void emit_save_literal(Node *node, Type *totype, int off) {
         if (off)
             emit("add B, %d", MOD24(off));
         emit("mov A, %d", MOD24(v));
-        emit("store A, B");
+        emit("store%d A, B", totype->size*8);
         break;
     }
     case KIND_FLOAT:
@@ -560,8 +569,8 @@ static void emit_copy_struct(Node *left, Node *right) {
     emit("mov B, A");
     int i = 0;
     for (; i < left->ty->size; i++) {
-        emit("load A, B");
-        emit("store A, C");
+        emit("load8 A, B");
+        emit("store8 A, C");
         emit("add B, 1");
         emit("add C, 1");
     }
@@ -613,7 +622,10 @@ static void emit_decl_init(Vector *inits, int off, int totalsize) {
 
 static void emit_pre_inc_dec(Node *node, char *op) {
     emit_expr(node->operand);
-    emit("%s A, 1", op);
+    if(node->ty->kind == KIND_PTR)
+        emit("%s A, %d", op, node->ty->ptr->size);
+    else
+        emit("%s A, 1", op);
     emit_store(node->operand);
 }
 
@@ -621,7 +633,10 @@ static void emit_post_inc_dec(Node *node, char *op) {
     SAVE;
     emit_expr(node->operand);
     push("A");
-    emit("%s A, 1", op);
+    if(node->ty->kind == KIND_PTR)
+        emit("%s A, %d", op, node->ty->ptr->size);
+    else
+        emit("%s A, 1", op);
     emit_store(node->operand);
     pop("A");
 }
@@ -829,9 +844,21 @@ static void emit_builtin_va_start(Node *node) {
 
 #endif
 
-static bool maybe_emit_builtin(Node *node) {
-#if 0
+static void emit_builtin_gadget_address(Node* node)
+{
     SAVE;
+    assert(vec_len(node->args) == 1);
+    Node* n2 = vec_head(node->args);
+    if(n2->kind == AST_CONV)
+        n2 = n2->operand;
+    assert(n2->kind == AST_LITERAL && n2->ty->kind == KIND_ARRAY);
+    const char* gadget = n2->sval;
+    emit(".gadget_addr A, %s", gadget);
+}
+
+static bool maybe_emit_builtin(Node *node) {
+    SAVE;
+#if 0
     if (!strcmp("__builtin_return_address", node->fname)) {
         emit_builtin_return_address(node);
         return true;
@@ -844,10 +871,13 @@ static bool maybe_emit_builtin(Node *node) {
         emit_builtin_va_start(node);
         return true;
     }
-    return false;
-#else
-    return false;
 #endif
+    if(!strcmp("___builtin_gadget_addr", node->fname))
+    {
+        emit_builtin_gadget_address(node);
+        return true;
+    }
+    return false;
 }
 
 static void classify_args(Vector *ints, Vector *args) {
@@ -906,9 +936,9 @@ static void emit_func_call(Node *node) {
 
     if (!node->fname) {
         emit_call(node);
-    } else if (!strcmp(node->fname, "__builtin_dump")) {
+    } else if (!strcmp(node->fname, "___builtin_dump")) {
         emit("dump");
-    } else if (!strcmp(node->fname, "exit")) {
+    /*} else if (!strcmp(node->fname, "exit")) {
         emit("exit");
     } else if (!strcmp(node->fname, "putchar")) {
         emit("putc A");
@@ -917,12 +947,12 @@ static void emit_func_call(Node *node) {
         emit("getc A");
         emit("jne %s, A, 0", end);
         emit("mov A, -1");
-        emit_label(end);
+        emit_label(end);*/
     } else {
         emit_call(node);
     }
     if (vec_len(ints))
-        emit("add SP, %d", vec_len(ints));
+        emit("sub SP, %d", -8*vec_len(ints));
     stackpos -= vec_len(ints);
     assert(opos == stackpos);
 }
@@ -950,6 +980,7 @@ static void emit_deref(Node *node) {
 static void emit_ternary(Node *node) {
     SAVE;
     emit_expr(node->cond);
+    emit_intcast(node->cond->ty);
     char *ne = make_label();
     emit_je(ne);
     if (node->then)
@@ -991,9 +1022,11 @@ static void emit_logand(Node *node) {
     SAVE;
     char *end = make_label();
     emit_expr(node->left);
+    emit_intcast(node->left->ty);
     emit("mov B, 0");
     emit("jeq %s, A, 0", end);
     emit_expr(node->right);
+    emit_intcast(node->right->ty);
     emit("mov B, A");
     emit("ne B, 0");
     emit_label(end);
@@ -1004,9 +1037,11 @@ static void emit_logor(Node *node) {
     SAVE;
     char *end = make_label();
     emit_expr(node->left);
+    emit_intcast(node->left->ty);
     emit("mov B, 1");
     emit("jne %s, A, 0", end);
     emit_expr(node->right);
+    emit_intcast(node->right->ty);
     emit("mov B, A");
     emit("ne B, 0");
     emit_label(end);
@@ -1016,6 +1051,7 @@ static void emit_logor(Node *node) {
 static void emit_lognot(Node *node) {
     SAVE;
     emit_expr(node->operand);
+    emit_intcast(node->operand->ty);
     emit("eq A, 0");
 }
 
@@ -1024,10 +1060,8 @@ static void emit_bitand(Node *node) {
     emit_expr(node->left);
     push("A");
     emit_expr(node->right);
-    push("A");
-    emit_call_builtin("__builtin_and");
-    emit("add SP, 2");
-    stackpos -= 3;
+    pop("B");
+    emit("and A, B");
 }
 
 static void emit_bitor(Node *node) {
@@ -1035,19 +1069,14 @@ static void emit_bitor(Node *node) {
     emit_expr(node->left);
     push("A");
     emit_expr(node->right);
-    push("A");
-    emit_call_builtin("__builtin_or");
-    emit("add SP, 2");
-    stackpos -= 3;
+    pop("B");
+    emit("or A, B");
 }
 
 static void emit_bitnot(Node *node) {
     SAVE;
     emit_expr(node->left);
-    push("A");
-    emit_call_builtin("__builtin_not");
-    emit("add SP, 1");
-    stackpos -= 2;
+    emit("not A");
 }
 
 static void emit_cast(Node *node) {
@@ -1315,12 +1344,13 @@ static void emit_global_var(Node *v) {
 }
 
 static void assign_func_param_offsets(Vector *params, int off) {
-    int arg = 2;
+    int arg = 16;
     for (int i = 0; i < vec_len(params); i++) {
         Node *v = vec_get(params, i);
         if (is_flotype(v->ty))
             assert_float();
-        v->loff = arg++;
+        v->loff = arg;
+        arg += 8;
     }
 }
 
@@ -1336,14 +1366,16 @@ static void emit_func_prologue(Node *func) {
     int off = 0;
     assign_func_param_offsets(func->params, off);
 
-    int localarea = 0;
     for (int i = 0; i < vec_len(func->localvars); i++) {
         Node *v = vec_get(func->localvars, i);
+        long long e;
         int size = v->ty->size;
         off -= size;
+        off &= -v->ty->align;
         v->loff = off;
-        localarea += size;
     }
+    off &= -8; // keep stack 8byte aligned
+    int localarea = -off;
     if (localarea) {
         emit("sub SP, %d", localarea);
         stackpos += localarea;

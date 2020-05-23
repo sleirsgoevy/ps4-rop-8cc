@@ -1,0 +1,45 @@
+#!/bin/bash
+
+self="$0"
+
+if [ "x${self:0:1}" != x/ ]
+then self="$PWD/$self"
+fi
+
+self="$(dirname "$self")"
+
+temp="$(mktemp -d)"
+
+failure ()
+{
+    if [ "x$KEEPTEMP" == x ]
+    then rm -rf "$temp"
+    fi
+    exit 1
+}
+
+out_o="$1"
+shift
+
+"$self/../8cc" "$self/../crt/crt_native.c" -S -o "$temp/pp.s" || failure
+cat "$temp/pp.s" > "$temp/linked.s" || failure
+
+while [ "x$1" != x ]
+do
+cat >> "$temp/pp.c" << EOF
+unsigned short __builtin_bswap16(unsigned short);
+unsigned int __builtin_bswap32(unsigned int);
+unsigned long long __builtin_bswap64(unsigned long long);
+EOF
+cpp -DPRINTF_DISABLE_SUPPORT_FLOAT '-D__asm__(...)=' '-D__restrict=' '-D__extension__=' '-D__builtin_va_list=int' '-D__inline=' '-D__attribute__(x)=' -isystem "$self/../include" -P "$1" >> "$temp/pp.c" || failure
+"$self/../8cc" "$temp/pp.c" -S -o "$temp/pp.s" || failure
+cat "$temp/pp.s" >> "$temp/linked.s" || failure
+echo >> "$temp/linked.s" || failure
+shift
+done
+python3 "$self/nativecalls.py" < "$temp/linked.s" | python3 "$self/s2x64.py" > "$temp/linked.asm" || failure
+yasm -f elf64 "$temp/linked.asm" -o "$out_o" || failure
+
+if [ "x$KEEPTEMP" == x ]
+then rm -rf "$temp"
+fi

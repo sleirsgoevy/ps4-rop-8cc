@@ -48,19 +48,19 @@ static char *lcontinue;
 Type *type_void = &(Type){ KIND_VOID, 0, 0, false };
 Type *type_bool = &(Type){ KIND_BOOL, 1, 1, true };
 Type *type_char = &(Type){ KIND_CHAR, 1, 1, false };
-Type *type_short = &(Type){ KIND_SHORT, 1, 1, false };
-Type *type_int = &(Type){ KIND_INT, 1, 1, false };
-Type *type_long = &(Type){ KIND_LONG, 1, 1, false };
-Type *type_llong = &(Type){ KIND_LLONG, 1, 1, false };
+Type *type_short = &(Type){ KIND_SHORT, 2, 2, false };
+Type *type_int = &(Type){ KIND_INT, 4, 4, false };
+Type *type_long = &(Type){ KIND_LONG, 8, 8, false };
+Type *type_llong = &(Type){ KIND_LLONG, 8, 8, false };
 Type *type_uchar = &(Type){ KIND_CHAR, 1, 1, true };
-Type *type_ushort = &(Type){ KIND_SHORT, 1, 1, true };
-Type *type_uint = &(Type){ KIND_INT, 1, 1, true };
-Type *type_ulong = &(Type){ KIND_LONG, 1, 1, true };
-Type *type_ullong = &(Type){ KIND_LLONG, 1, 1, true };
+Type *type_ushort = &(Type){ KIND_SHORT, 2, 2, true };
+Type *type_uint = &(Type){ KIND_INT, 4, 4, true };
+Type *type_ulong = &(Type){ KIND_LONG, 8, 8, true };
+Type *type_ullong = &(Type){ KIND_LLONG, 8, 8, true };
 Type *type_float = &(Type){ KIND_INT, 1, 1, false };
 Type *type_double = &(Type){ KIND_INT, 1, 1, false };
 Type *type_ldouble = &(Type){ KIND_INT, 1, 1, false };
-Type *type_enum = &(Type){ KIND_ENUM, 1, 1, false };
+Type *type_enum = &(Type){ KIND_ENUM, 4, 4, false };
 
 static Type* make_ptr_type(Type *ty);
 static Type* make_array_type(Type *ty, int size);
@@ -159,6 +159,14 @@ static Node *make_ast(Node *tmpl) {
     return r;
 }
 
+static char* underscore(const char* src)
+{
+    char* out = malloc(strlen(src)+2);
+    out[0] = '_';
+    strcpy(out+1, src);
+    return out;
+}
+
 static Node *ast_uop(int kind, Type *ty, Node *operand) {
     return make_ast(&(Node){ kind, ty, .operand = operand });
 }
@@ -179,7 +187,7 @@ static Node *ast_floattype(Type *ty, double val) {
 }
 
 static Node *ast_lvar(Type *ty, char *name) {
-    Node *r = make_ast(&(Node){ AST_LVAR, ty, .varname = name });
+    Node *r = make_ast(&(Node){ AST_LVAR, ty, .varname = underscore(name) });
     if (localenv)
         map_put(localenv, name, r);
     if (localvars)
@@ -188,7 +196,7 @@ static Node *ast_lvar(Type *ty, char *name) {
 }
 
 static Node *ast_gvar(Type *ty, char *name) {
-    Node *r = make_ast(&(Node){ AST_GVAR, ty, .varname = name, .glabel = name });
+    Node *r = make_ast(&(Node){ AST_GVAR, ty, .varname = name, .glabel = underscore(name) });
     map_put(globalenv, name, r);
     return r;
 }
@@ -247,7 +255,7 @@ static Node *ast_funcall(Type *ftype, char *fname, Vector *args) {
 }
 
 static Node *ast_funcdesg(Type *ty, char *fname) {
-    return make_ast(&(Node){ AST_FUNCDESG, ty, .fname = fname });
+    return make_ast(&(Node){ AST_FUNCDESG, ty, .fname = underscore(fname) });
 }
 
 static Node *ast_funcptr_call(Node *fptr, Vector *args) {
@@ -264,7 +272,7 @@ static Node *ast_func(Type *ty, char *fname, Vector *params, Node *body, Vector 
     return make_ast(&(Node){
         .kind = AST_FUNC,
         .ty = ty,
-        .fname = fname,
+        .fname = underscore(fname),
         .params = params,
         .localvars = localvars,
         .body = body});
@@ -299,7 +307,7 @@ static Node *ast_compound_stmt(Vector *stmts) {
 }
 
 static Node *ast_struct_ref(Type *ty, Node *struc, char *name) {
-    return make_ast(&(Node){ AST_STRUCT_REF, ty, .struc = struc, .field = name });
+    return make_ast(&(Node){ AST_STRUCT_REF, ty, .struc = struc, .field = underscore(name) });
 }
 
 static Node *ast_goto(char *label) {
@@ -315,7 +323,7 @@ static Node *ast_computed_goto(Node *expr) {
 }
 
 static Node *ast_label(char *label) {
-    return make_ast(&(Node){ AST_LABEL, .label = label });
+    return make_ast(&(Node){ AST_LABEL, .label = underscore(label) });
 }
 
 static Node *ast_dest(char *label) {
@@ -323,7 +331,7 @@ static Node *ast_dest(char *label) {
 }
 
 static Node *ast_label_addr(char *label) {
-    return make_ast(&(Node){ OP_LABEL_ADDR, make_ptr_type(type_void), .label = label });
+    return make_ast(&(Node){ OP_LABEL_ADDR, make_ptr_type(type_void), .label = underscore(label) });
 }
 
 static Type *make_type(Type *tmpl) {
@@ -345,10 +353,10 @@ static Type *make_numtype(int kind, bool usig) {
     if (kind == KIND_VOID)         r->size = r->align = 0;
     else if (kind == KIND_BOOL)    r->size = r->align = 1;
     else if (kind == KIND_CHAR)    r->size = r->align = 1;
-    else if (kind == KIND_SHORT)   r->size = r->align = 1;
-    else if (kind == KIND_INT)     r->size = r->align = 1;
-    else if (kind == KIND_LONG)    r->size = r->align = 1;
-    else if (kind == KIND_LLONG)   r->size = r->align = 1;
+    else if (kind == KIND_SHORT)   r->size = r->align = 2;
+    else if (kind == KIND_INT)     r->size = r->align = 4;
+    else if (kind == KIND_LONG)    r->size = r->align = 8;
+    else if (kind == KIND_LLONG)   r->size = r->align = 8;
     else if (kind == KIND_FLOAT)   r->size = r->align = 4, error("float");
     else if (kind == KIND_DOUBLE)  r->size = r->align = 8, error("float");
     else if (kind == KIND_LDOUBLE) r->size = r->align = 8, error("float");
@@ -357,7 +365,7 @@ static Type *make_numtype(int kind, bool usig) {
 }
 
 static Type* make_ptr_type(Type *ty) {
-    return make_type(&(Type){ KIND_PTR, .ptr = ty, .size = 1, .align = 1 });
+    return make_type(&(Type){ KIND_PTR, .ptr = ty, .size = 8, .align = 8 });
 }
 
 static Type* make_array_type(Type *ty, int len) {

@@ -1,0 +1,6 @@
+[submodule "printf"]
+	path = printf
+	url = https://github.com/mpaland/printf
+[submodule "bad_hoist"]
+	path = bad_hoist
+	url = https://github.com/sleirsgoevy/bad_hoist
