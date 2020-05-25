@@ -68,6 +68,7 @@ pop rsi
 mov [rsi], rax
 pop rdi
 rdi_bak:
+_pivot_back_addr:
 dq 0
 \$pivot_addr
 EOF

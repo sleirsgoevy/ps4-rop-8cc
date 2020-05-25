@@ -48,6 +48,10 @@ create_extcall(ec, my_very_func, stack, opaque);
 native_func(..., extcall_gadget, ec, ...);
 ```
 
+To call a native function pointer, you must call `rop_call_funcptr` or implement the same functionality yourself:
+
+`rop_call_funcptr(ptr_to_printf, "Hello, %s!\n", "world");`
+
 Note: there is a ready-to-use wrapper for `pthread_create` in `librop/pthread_create.h` that will perform the conversion for you.
 
 ## Speed

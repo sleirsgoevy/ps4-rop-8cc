@@ -284,6 +284,12 @@ def emit_nativecall(lbl):
         assert lbl.startswith('_')
         print(lbl+':')
         lbl = lbl[1:]
+    if lbl == 'rop_call_funcptr':
+        funcptr = True
+        args_base = 16
+    else:
+        funcptr = False
+        args_base = 8
     ropchain_base = -200
     # load arguments into registers
     set_to_const(ropchain_base, 'pop rdi')
@@ -306,12 +312,13 @@ def emit_nativecall(lbl):
     # ret
     set_to_const(ropchain_base+184, 'pop rsp')
     copy(ropchain_base+192, 0)
-    copy(ropchain_base+8, 8)
-    copy(ropchain_base+24, 16)
-    copy(ropchain_base+40, 24)
-    copy(ropchain_base+56, 32)
-    copy(ropchain_base+72, 40)
-    copy(ropchain_base+88, 48)
+    # args
+    copy(ropchain_base+8, args_base)
+    copy(ropchain_base+24, args_base+8)
+    copy(ropchain_base+40, args_base+16)
+    copy(ropchain_base+56, args_base+24)
+    copy(ropchain_base+72, args_base+32)
+    copy(ropchain_base+88, args_base+40)
     # take care of the alignment
     # will overwrite one of the nop slots
     set_rdi(ropchain_base+104)
@@ -319,8 +326,16 @@ def emit_nativecall(lbl):
     print('pop rcx')
     print('dq -16')
     print('and rax, rcx')
-    print('pop rcx')
-    print('$'+lbl+'_addr')
+    if funcptr:
+        set_rdi(args_base-0x20)
+        print('mov rcx, [rdi + 0x18] ; lea rax, [rax + rcx - 1]')
+        print('sub rax, rcx ; sbb rdx, rcx')
+        print('pop rsi')
+        print('dq 1')
+        print('add rax, rsi')
+    else:
+        print('pop rcx')
+        print('$'+lbl+'_addr')
     print('mov [rax], rcx')
     # back up SP, BP, lr
     set_rdi(8)
