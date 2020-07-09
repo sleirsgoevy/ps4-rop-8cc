@@ -290,7 +290,7 @@ def emit_nativecall(lbl):
     else:
         funcptr = False
         args_base = 8
-    ropchain_base = -200
+    ropchain_base = -208
     # load arguments into registers
     set_to_const(ropchain_base, 'pop rdi')
     set_to_const(ropchain_base+16, 'pop rsi')
@@ -298,20 +298,21 @@ def emit_nativecall(lbl):
     set_to_const(ropchain_base+48, 'pop rcx')
     set_to_const(ropchain_base+64, 'pop r8')
     set_to_const(ropchain_base+80, 'pop r9')
+    set_to_const(ropchain_base+96, 'xor rax, rax') # number of floating-point varargs is always 0
     # call the function
     # will be overwritten later, need to take care of the alignment
-    set_to_const(ropchain_base+96, 'nop')
     set_to_const(ropchain_base+104, 'nop')
+    set_to_const(ropchain_base+112, 'nop')
     # mov rcx, rax
-    set_to_const(ropchain_base+112, 'pop rsi')
-    set_to_const(ropchain_base+128, 'mov [rsi], rax')
-    set_to_const(ropchain_base+136, 'pop rcx')
+    set_to_const(ropchain_base+120, 'pop rsi')
+    set_to_const(ropchain_base+136, 'mov [rsi], rax')
+    set_to_const(ropchain_base+144, 'pop rcx')
     # restore SP and BP
-    set_to_const(ropchain_base+152, 'pop rdi')
-    set_to_const(ropchain_base+168, 'pop r8')
+    set_to_const(ropchain_base+160, 'pop rdi')
+    set_to_const(ropchain_base+176, 'pop r8')
     # ret
-    set_to_const(ropchain_base+184, 'pop rsp')
-    copy(ropchain_base+192, 0)
+    set_to_const(ropchain_base+192, 'pop rsp')
+    copy(ropchain_base+200, 0)
     # args
     copy(ropchain_base+8, args_base)
     copy(ropchain_base+24, args_base+8)
@@ -321,7 +322,7 @@ def emit_nativecall(lbl):
     copy(ropchain_base+88, args_base+40)
     # take care of the alignment
     # will overwrite one of the nop slots
-    set_rdi(ropchain_base+104)
+    set_rdi(ropchain_base+112)
     load_rax_from('rdi')
     print('pop rcx')
     print('dq -16')
@@ -340,14 +341,14 @@ def emit_nativecall(lbl):
     # back up SP, BP, lr
     set_rdi(8)
     load_rax_from('rdi')
-    set_rdi(ropchain_base+160)
+    set_rdi(ropchain_base+168)
     store()
-    set_rdi(ropchain_base+176)
+    set_rdi(ropchain_base+184)
     load_rax_from('r8')
     store()
-    set_rdi(ropchain_base+144)
+    set_rdi(ropchain_base+152)
     load_rax_from('rdi')
-    set_rdi(ropchain_base+120)
+    set_rdi(ropchain_base+128)
     store()
     lbl2 = make_label()
     set_rdi(ropchain_base)
