@@ -7,7 +7,7 @@ void create_extcall(extcall_t arr, void(*func)(void), void* emu_stack, void* opa
     unsigned long long* st = emu_stack;
     // pivot-related stuff
     arr[0] = arr + 1;
-    arr[1] = __builtin_gadget_addr("$ pivot_addr");
+    arr[1] = __builtin_gadget_addr("$pivot_addr");
     arr[7] = arr + 8;
     arr[8] = opaque;
     // store arguments

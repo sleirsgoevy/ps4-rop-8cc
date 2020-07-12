@@ -534,7 +534,7 @@ while True:
             else:
                 emit_condjump(cmd[1:], args[0], reg_map[args[1]], format_imm(args[2]), imm=True)
         elif cmd == '.gadget_addr':
-            emit_load_imm(reg_map[args[0]], ', '.join(args[1:]))
+            emit_load_imm(reg_map[args[0]], ' '+', '.join(args[1:]))
         else:
             assert False, l
     #exchange_regs(None)

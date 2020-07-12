@@ -16,8 +16,8 @@ while True:
     except EOFError: break
     l = l.split('#', 1)[0].strip()
     if not l: continue
-    if l == '$ pivot_addr': l = 'mov rsp, [rdi+0x38] ; pop rdi'
-    elif l == '$ jop_frame_addr': l = 'push rbp ; mov rbp, rsp ; mov rax, [rdi] ; call [rax]'
+    if l == '$pivot_addr': l = 'mov rsp, [rdi+0x38] ; pop rdi'
+    elif l == '$jop_frame_addr': l = 'push rbp ; mov rbp, rsp ; mov rax, [rdi] ; call [rax]'
     if l.startswith('$'):
         if l.endswith('_addr'):
             print('extern', l[1:-5])

@@ -2,7 +2,7 @@
 
 unsigned long long __builtin_gadget_addr(const char* s);
 
-#define extcall_gadget ((void(*)(void))__builtin_gadget_addr("$ jop_frame_addr"))
+#define extcall_gadget ((void(*)(void))__builtin_gadget_addr("$jop_frame_addr"))
 
 typedef unsigned long long extcall_t[39];
 
