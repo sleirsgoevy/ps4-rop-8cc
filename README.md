@@ -1,6 +1,6 @@
 # ps4-rop-8cc
 
-This is a port of shinh's [ELVM branch of 8cc](https://github.com/shinh/8cc/tree/eir) to the PS4 return-oriented programming. It runs C code on OFW 6.51 via [Fire30's WebKit exploit](https://github.com/Fire30/bad_hoist).
+This is a port of shinh's [ELVM branch of 8cc](https://github.com/shinh/8cc/tree/eir) to the PS4 return-oriented programming. It runs C code on OFW 6.51 (EDIT: 6.72 confirmed to be working too) via [Fire30's WebKit exploit](https://github.com/Fire30/bad_hoist).
 
 ## Building
 
