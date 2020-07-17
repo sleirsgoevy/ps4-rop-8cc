@@ -40,6 +40,7 @@ done
 cat >> "$temp/linked.rop" << EOF
 \$\$var main_ret = malloc(8);
 \$\$var printf_buf = malloc(65536);
+\$\$var __swbuf_addr = 0; // STUB
 pop rax
 dp rdi_bak
 mov [rax], rdi
