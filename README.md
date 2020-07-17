@@ -65,3 +65,4 @@ This is no speed demon. `8cc` compiles the C code to a stack machine, and is is 
 * 64-bit integer comparison is always signed.
 * Arithmetic shift right is not supported (yet).
 * The generated ROP is reentrant but not thread-safe. That is, one ROP function can only be called on a single thread. This does not apply to rop-to-native calls.
+* Although the toolchain uses full FreeBSD headers, only the functions that map 1:1 to system calls can be used.

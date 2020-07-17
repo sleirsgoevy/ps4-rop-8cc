@@ -9,4 +9,4 @@ typedef unsigned long long extcall_t[39];
 void create_extcall(extcall_t ec, void(*func)(void), void* stack, void* opaque);
 
 // call native function pointer from ROP
-void rop_call_funcptr(void(*)(void), ...);
+unsigned long long rop_call_funcptr(void(*)(void), ...);

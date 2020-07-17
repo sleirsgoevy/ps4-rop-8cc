@@ -31,7 +31,7 @@ unsigned short __builtin_bswap16(unsigned short);
 unsigned int __builtin_bswap32(unsigned int);
 unsigned long long __builtin_bswap64(unsigned long long);
 EOF
-cpp -D__PS4__ -DPRINTF_DISABLE_SUPPORT_FLOAT '-D__asm__(...)=' '-D__restrict=' '-D__extension__=' '-D__builtin_va_list=int' '-D__inline=' '-D__attribute__(x)=' -isystem "$self/../include" -isystem "$self/../.." -P "$1" >> "$temp/pp.c" || failure
+cpp -D__PS4__ -DPRINTF_DISABLE_SUPPORT_FLOAT '-D__asm__(...)=' '-D__restrict=' '-D__extension__=' '-D__builtin_va_list=int' '-D__inline=' '-D__attribute__(x)=' '-D__asm(...)=' '-D__builtin_offsetof(a, b)=(((char*)&((a*)0)->b)-(char*)0)' -isystem "$self/../include" -isystem "$self/../.." -isystem "$self/../../freebsd-headers" -nostdinc "$1" >> "$temp/pp.c" || failure
 "$self/../8cc" "$temp/pp.c" -S -o "$temp/pp.s" || failure
 cat "$temp/pp.s" >> "$temp/linked.s" || failure
 echo >> "$temp/linked.s" || failure
