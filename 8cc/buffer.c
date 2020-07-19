@@ -107,7 +107,7 @@ static void print(Buffer *b, char c) {
 #ifdef __eir__
         buf_printf(b, "\\x%x", c);
 #else
-        buf_printf(b, "\\x%02x", c);
+        buf_printf(b, "\\x%02x", ((int)c)&255);
 #endif
     }
 }
