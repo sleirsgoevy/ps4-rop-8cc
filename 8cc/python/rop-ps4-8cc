@@ -60,6 +60,8 @@ dp stack_bottom
 _ps4_printf_buffer:
 \$\$var printf_buf_offset = SP_OFFSET;
 \$printf_buf
+_ps4_printf_fd:
+dq -1
 stack:
 db bytes(65536)
 stack_bottom:
