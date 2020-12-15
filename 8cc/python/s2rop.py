@@ -32,23 +32,26 @@ def do_exchange_regs(mapping):
     labels_dst = {}
     for k, v in items:
         labels_dst[k] = make_label()
+    is_first_rax = True
     for k, v in items:
         if v == 'rax':
+            if is_first_rax:
+                is_first_rax = False
+            else:
+                print('mov rax, [rsi]')
             print('pop rsi')
             print('dp', labels_dst[k])
-            print('mov [rsi], rax')
-    cur_rax = 'rax'
+            print('mov [rsi], rax ; mov al, 1')
     for k, v in items:
         if v != 'rax' and ' ' not in v and k != 'rax':
-            cur_rax = v
             print('mov rax,', v)
             print('pop rsi')
             print('dp', labels_dst[k])
-            print('mov [rsi], rax')
-    if ' ' not in mapping['rax'] and mapping['rax'] != 'rax' and mapping['rax'] != cur_rax and 'r11' not in mapping:
+            print('mov [rsi], rax ; mov al, 1')
+    if ' ' not in mapping['rax'] and mapping['rax'] != 'rax' and 'r11' not in mapping:
         print('mov rax,', mapping['rax'])
     if 'r11' in mapping:
-        print('pop r11 ; mov rax, rdi')
+        print('pop r11') # TODO: remove this hack
         print(labels_dst['r11']+':')
         if ' ' in mapping['r11']: print(mapping['r11'])
         else: print('dq 0')
@@ -161,6 +164,11 @@ def emit_binary_op_imm(instr, reg, imm):
         emit_load_imm('rsi', 'dq -('+imm[3:]+')')
         exchange_regs(None)
         emit_instr('add rax, rsi')
+    elif instr == 'xor rax, rcx':
+        emit_load_imm('rsi', imm)
+        exchange_regs(None)
+        emit_instr('xor rax, rsi ; sub rax, rsi')
+        emit_instr('add rax, rsi')
     else:
         exchange_regs({'r11': 'rcx'})
         emit_load_imm('rcx', imm)
@@ -227,7 +235,7 @@ def emit_condjump(opcode, dst, a, b, imm=False):
     emit_instr('mov rax, [rax]')
     emit_instr('pop rsi')
     emit_instr('dp %s'%l)
-    emit_instr('mov [rsi], rax')
+    emit_instr('mov [rsi], rax ; mov al, 1')
     emit_instr('mov rax, r11')
     emit_instr('pop rsp')
     emit_instr(l+':')
@@ -305,7 +313,7 @@ def emit_nativecall(lbl):
     set_to_const(ropchain_base+112, 'nop')
     # mov rcx, rax
     set_to_const(ropchain_base+120, 'pop rsi')
-    set_to_const(ropchain_base+136, 'mov [rsi], rax')
+    set_to_const(ropchain_base+136, 'mov [rsi], rax ; mov al, 1')
     set_to_const(ropchain_base+144, 'pop rcx')
     # restore SP and BP
     set_to_const(ropchain_base+160, 'pop rdi')
@@ -355,7 +363,7 @@ def emit_nativecall(lbl):
     load_rax_from('rdi')
     print('pop rsi')
     print('dp', lbl2)
-    print('mov [rsi], rax')
+    print('mov [rsi], rax ; mov al, 1')
     print('pop rsp')
     print(lbl2+':')
     print('dq 0')
@@ -419,7 +427,7 @@ while True:
         print('sub rdi, rsi ; mov rdx, rdi')
         print('pop rsi')
         print('dp', lbl3)
-        print('mov [rsi], rax')
+        print('mov [rsi], rax ; mov al, 1')
         print('pop rsp')
         print(lbl3+':')
         print('dq 0')
@@ -447,7 +455,10 @@ while True:
             instr = cmd+' rax, rcx'
             if cmd == 'sub': instr += ' ; sbb rdx, rcx'
             if args[1] in reg_map:
-                emit_binary_op(instr, reg_map[args[0]], reg_map[args[1]])
+                if cmd == 'xor':
+                    emit_binary_op('xor rax, rsi ; sub rax, rsi\nadd rax, rsi', reg_map[args[0]], reg_map[args[1]], {'rsi': 'rcx', 'rcx': 'rsi'}, {'rcx': 'rsi', 'rsi': 'rcx'})
+                else:
+                    emit_binary_op(instr, reg_map[args[0]], reg_map[args[1]])
             else:
                 emit_binary_op_imm(instr, reg_map[args[0]], format_imm(args[1]))
         elif cmd in ('shl', 'shr'):

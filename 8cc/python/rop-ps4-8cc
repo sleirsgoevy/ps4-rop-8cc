@@ -68,7 +68,7 @@ stack_bottom:
 mov rax, rcx
 pop rsi
 \$main_ret
-mov [rsi], rax
+mov [rsi], rax ; mov al, 1
 pop rdi
 rdi_bak:
 _pivot_back_addr:

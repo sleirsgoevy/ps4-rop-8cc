@@ -18,42 +18,64 @@ var printf_ans = ''+e+'\\n'+e.stack;
 
 HTML = b'''\
 <html>
-<body>
-<script>function print(){}</script>
-<script src="/exploit.js"></script>
-<script src="/helpers.js"></script>
-<script src="/malloc.js"></script>
-<script src="/rop.js"></script>
-<script src="/syscalls.js"></script>
-<script src="/syscalls2.js"></script>
-<script src="/c-code.js"></script>
+<body onload="go()">
 <script>
+function print(){}
+
+window.postExploit = function()
+{
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/payload.js', true);
+    xhr.send('');
+    xhr.onload = function()
+    {
+        eval.call(window, xhr.responseText);
+    }
+};
+</script>
+<script src="/external/utils.js"></script>
+<script src="/external/int64.js"></script>
+<script src="/external/ps4.js"></script>
+<button id="input1" onfocus="handle2()"></button>
+<button id="input2"></button>
+<button id="input3" onfocus="handle2()"></button>
+<select id="select1">
+<option value="value1">Value1</option>
+</select>
+</body>
+</html>
+'''
+
+SCRIPTS = [
+    'bad_hoist/helpers.js',
+    'bad_hoist/malloc.js',
+    'bad_hoist/rop/rop.js',
+    'bad_hoist/dumps/syscalls.txt',
+    'build/syscall_names.txt',
+]
+
+TAIL_JS = b'''\
 var xxx = new XMLHttpRequest();
 xxx.open("POST", "/", true);
 xxx.onload = read_ptr_at.bind(window, 0);
 xxx.send(printf_ans+'\\nmain() returned '+main_ret);
-</script>
-</body>
-</html>
 '''
 
 class RequestHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/': data = HTML
-        elif self.path == '/c-code.js': data = js
+        elif self.path == '/payload.js':
+            data = b''
+            for i in SCRIPTS:
+                with open(i, 'rb') as file:
+                    data += file.read() + b'\n'
+            data += js + b'\n'
+            data += TAIL_JS
+        elif self.path.startswith('/external/') and '..' not in self.path:
+            data = open('bad_hoist'+self.path, 'rb').read()
         else:
-            try: filename = {
-                '/exploit.js': 'bad_hoist/exploit.js',
-                '/helpers.js': 'bad_hoist/helpers.js',
-                '/malloc.js': 'bad_hoist/malloc.js',
-                '/rop.js': 'bad_hoist/rop/rop.js',
-                '/syscalls.js': 'bad_hoist/dumps/syscalls.txt',
-                '/syscalls2.js': 'build/syscall_names.txt',
-            }[self.path]
-            except KeyError:
-                self.send_error(404)
-                return
-            data = open(filename, 'rb').read()
+            self.send_error(404)
+            return
         self.send_response(200)
         self.send_header('Content-Type', 'application/javascript' if self.path.endswith('.js') else 'text/html')
         self.send_header('Content-Length', len(data))
