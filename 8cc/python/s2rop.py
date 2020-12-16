@@ -48,16 +48,11 @@ def do_exchange_regs(mapping):
             print('pop rsi')
             print('dp', labels_dst[k])
             print('mov [rsi], rax ; mov al, 1')
-    if ' ' not in mapping['rax'] and mapping['rax'] != 'rax' and 'r11' not in mapping:
+    if ' ' not in mapping['rax'] and mapping['rax'] != 'rax':
         print('mov rax,', mapping['rax'])
-    if 'r11' in mapping:
-        print('pop r11') # TODO: remove this hack
-        print(labels_dst['r11']+':')
-        if ' ' in mapping['r11']: print(mapping['r11'])
-        else: print('dq 0')
     for k, v in items:
         assert ' ' not in k
-        if (k != 'rax' or ' ' in v or v == 'rax' or 'r11' in mapping) and k not in ('rsp', 'r11'):
+        if (k != 'rax' or ' ' in v or v == 'rax') and k != 'rsp':
             print('pop', k)
             print(labels_dst[k]+':')
             if ' ' in v: print(v)
