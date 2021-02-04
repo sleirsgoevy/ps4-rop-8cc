@@ -26,8 +26,10 @@ while True:
     if not l: continue
     if l == '.text':
         print('section .text')
-    elif l == '.data':
-        print('section .data')
+    elif l == '.data' or l.startswith('.data '):
+        depth = 0 if l == '.data' else int(l[6:])
+        print('section .data.'+str(depth))
+        print('align 8')
     elif l.endswith(':'):
         if l.startswith('_'):
             print('global', l[1:-1])
