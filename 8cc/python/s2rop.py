@@ -85,7 +85,8 @@ def emit_instr(*args):
 
 def emit_mov(reg_dst, reg_src):
     if reg_dst == 'rax' and not cur_exchange:
-        emit_instr('mov rax,', reg_src)
+        if reg_src != 'rax':
+            emit_instr('mov rax,', reg_src)
     else:
         if reg_src != 'rax':
             warn('CHECK_FALLBACK', 'mov %s, %s: fallback'%(reg_dst, reg_src))
@@ -245,8 +246,9 @@ def format_imm(imm):
     try: return 'dq '+hex(int(imm, 0))
     except ValueError: return 'dp '+imm
 
-data_segment = []
-is_data = False
+data_segments = []
+data_partial_words = []
+is_data = -1
 local_labels = {}
 
 def emit_nativecall(lbl):
@@ -369,9 +371,13 @@ while True:
     l = ' '.join(l0.split('#', 1)[0].replace(',', ', ').split())
     if not l: continue
     if l == '.text':
-        is_data = False
+        is_data = -1
     elif l == '.data' or l.startswith('.data '):
-        is_data = True
+        is_data = 0 if l == '.data' else int(l[6:])
+        while len(data_segments) <= is_data:
+            data_segments.append([])
+            data_partial_words.append(b'')
+        data_partial_words[is_data] += bytes((-len(data_partial_words[is_data])) % 8)
     elif l.endswith(':'):
         lbl = l[:-1] 
         if lbl.startswith('.'): # local label
@@ -382,19 +388,42 @@ while True:
         else: # global label
             assert lbl.startswith('_')
             local_labels.clear()
-        if is_data:
-            data_segment.append(lbl+':')
+        if is_data >= 0:
+            assert len(data_partial_words[is_data]) % 8 == 0
+            if data_partial_words[is_data]:
+                data_segments[is_data].append('db '+repr(list(data_partial_words[is_data]))[1:-1])
+                data_partial_words[is_data] = b''
+            data_segments[is_data].append(lbl+':')
         else:
             exchange_regs(None)
             emit_instr(lbl+':')
     elif any(l.startswith(i) for i in ('.file ', '.loc ')):
         pass
     elif l.startswith('.string '):
-        assert is_data
+        assert is_data >= 0
         arg = l0[l0.find('.string')+7:].strip()
         s = eval('b'+arg)+b'\0'
-        while len(s) % 8: s += b'\0'
-        data_segment.append('db '+repr(list(s))[1:-1])
+        s += bytes((-len(s)) % 8)
+        data_partial_words[is_data] += s
+    elif l.startswith('.byte '):
+        assert is_data >= 0
+        data_partial_words[is_data] += bytes((int(l[6:]) & 255,))
+    elif l.startswith('.short '):
+        assert is_data >= 0
+        data_partial_words[is_data] += (int(l[7:]) & 65535).to_bytes(2, 'little')
+    elif l.startswith('.int '):
+        assert is_data >= 0
+        data_partial_words[is_data] += (int(l[5:]) & 0xffffffff).to_bytes(4, 'little')
+    elif l.startswith('.long '):
+        assert is_data >= 0
+        data_partial_words[is_data] += (int(l[6:]) & 0xffffffffffffffff).to_bytes(8, 'little')
+    elif l.startswith('.ptr '):
+        assert is_data >= 0
+        assert len(data_partial_words[is_data]) % 8 == 0
+        if data_partial_words[is_data]:
+            data_segments[is_data].append('db '+repr(list(data_partial_words[is_data]))[1:-1])
+        data_partial_words[is_data] = b''
+        data_segments[is_data].append(format_imm(l[5:]))
     elif l.startswith('nativecall '):
         lbl = l[11:]
         emit_nativecall(lbl)
@@ -545,4 +574,10 @@ while True:
             assert False, l
     #exchange_regs(None)
 
-for i in data_segment: print(i)
+for i in range(len(data_segments)):
+    for j in data_segments[i]:
+        print(j)
+    b = data_partial_words[i]
+    b += bytes((-len(b)) % 8)
+    if b:
+        print('db '+repr(list(b))[1:-1])

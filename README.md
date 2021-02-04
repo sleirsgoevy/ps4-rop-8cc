@@ -44,7 +44,7 @@ void my_very_func(void* opaque, ...); // only this format is supported
 
 extcall_t ec;
 char stack[8192]; // emulated stack to be used by my_very_func
-create_extcall(ec, my_very_func, stack, opaque);
+create_extcall(ec, my_very_func, stack + 8192, opaque);
 native_func(..., extcall_gadget, ec, ...);
 ```
 
@@ -60,7 +60,7 @@ This is no speed demon. `8cc` compiles the C code to a stack machine, and is is 
 
 ## Known bugs
 
-* Code using global or static variables won't compile. Use `mmap` if you are not happy with 64KB of stack.
+* ~~Code using global or static variables won't compile. Use `mmap` if you are not happy with 64KB of stack.~~ Probably fixed.
 * The constant-parsing code stores constants as `int` internally. This means that 64-bit constants won't work.
 * 64-bit integer comparison is always signed.
 * Arithmetic shift right is not supported (yet).
