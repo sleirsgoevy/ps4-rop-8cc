@@ -379,7 +379,7 @@ while True:
             data_partial_words.append(b'')
         data_partial_words[is_data] += bytes((-len(data_partial_words[is_data])) % 8)
     elif l.endswith(':'):
-        lbl = l[:-1] 
+        lbl = l[:-1]
         if lbl.startswith('.'): # local label
             if lbl in local_labels: lbl = local_labels[lbl]
             else:
@@ -387,7 +387,7 @@ while True:
                 lbl = local_labels[lbl]
         else: # global label
             assert lbl.startswith('_')
-            local_labels.clear()
+            local_labels = {k: v for k, v in local_labels.items() if k.startswith('.S')}
         if is_data >= 0:
             assert len(data_partial_words[is_data]) % 8 == 0
             if data_partial_words[is_data]:
