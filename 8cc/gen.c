@@ -1195,6 +1195,9 @@ static void emit_data_addr(Node *operand, int depth) {
     case AST_GVAR:
         emit(".ptr %s", operand->glabel);
         return;
+    case AST_FUNCDESG:
+        emit(".ptr %s", operand->fname);
+        return;
     default:
         error("internal error");
     }
