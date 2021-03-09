@@ -3,13 +3,12 @@ import sys, os
 reg_map = {
     'A': 'rax',
     'B': 'rcx',
-    'C': 'r10',
     'SP': 'rdi',
     'BP': 'r8'
 }
 conds = {'eq', 'ne', 'lt', 'le', 'gt', 'ge'}
 # rsi is used as a scratch register for some operation
-# r11 is used to back up a register when necessary
+backup_reg = 'r9' # used to back up a register when necessary
 
 def make_label(_static_cntr=[0]):
     # all user-provided labels are underscore-prefixed
@@ -97,12 +96,12 @@ def emit_binary_op(instr, reg_dst, reg_src, m1={}, m2={}):
         warn('CHECK_FALLBACK', '`%s` %s, %s: fallback'%(instr, reg_dst, reg_src))
     if reg_src == reg_dst:
         exchange_regs({reg_dst: 'rax', 'rax': reg_dst})
-        exchange_regs({'r11': 'rcx', 'rcx': 'rax'})
+        exchange_regs({backup_reg: 'rcx', 'rcx': 'rax'})
         exchange_regs(m1)
         exchange_regs(None)
         emit_instr(instr)
         exchange_regs(m2)
-        exchange_regs({'rcx': 'r11'})
+        exchange_regs({'rcx': backup_reg})
         exchange_regs({'rax': reg_dst, reg_dst: 'rax'})
     elif reg_src == 'rax' and reg_dst == 'rcx':
         exchange_regs({'rax': 'rcx', 'rcx': 'rax'})
@@ -166,11 +165,11 @@ def emit_binary_op_imm(instr, reg, imm):
         emit_instr('xor rax, rsi ; sub rax, rsi')
         emit_instr('add rax, rsi')
     else:
-        exchange_regs({'r11': 'rcx'})
+        exchange_regs({backup_reg: 'rcx'})
         emit_load_imm('rcx', imm)
         exchange_regs(None)
         emit_instr(instr)
-        exchange_regs({'rcx': 'r11'})
+        exchange_regs({'rcx': backup_reg})
     exchange_regs({reg: 'rax', 'rax': reg})
 
 def emit_jump_imm(dst):
@@ -217,11 +216,11 @@ def emit_condjump(opcode, dst, a, b, imm=False):
         if 'e' in lbl and 'ne' not in lbl:
             emit_jump_imm(dst)
         return
-    exchange_regs({'r11': a})
+    exchange_regs({backup_reg: a})
     if imm: emit_logic_imm(opcode, a, b)
     else: emit_logic(opcode, a, b)
-    exchange_regs({'r11': a, a: 'r11'})
-    exchange_regs({'rax': 'r11', 'r11': 'rax'})
+    exchange_regs({backup_reg: a, a: backup_reg})
+    exchange_regs({'rax': backup_reg, backup_reg: 'rax'})
     exchange_regs(None)
     l = make_label()
     emit_instr('shl rax, 3')
@@ -232,7 +231,7 @@ def emit_condjump(opcode, dst, a, b, imm=False):
     emit_instr('pop rsi')
     emit_instr('dp %s'%l)
     emit_instr('mov [rsi], rax ; mov al, 1')
-    emit_instr('mov rax, r11')
+    emit_instr('mov rax, '+backup_reg)
     emit_instr('pop rsp')
     emit_instr(l+':')
     emit_instr('dq 0') # target addr
@@ -511,29 +510,29 @@ while True:
                 cmd = 'icrop'+cmd[4:]
             if cmd == 'icrop64': continue
             elif cmd == 'icrop32':
-                exchange_regs({'r11': 'rdi'})
+                exchange_regs({backup_reg: 'rdi'})
                 exchange_regs({'rdi': 'rax'})
                 exchange_regs(None)
                 emit_instr('movsxd rax, edi')
-                exchange_regs({'rdi': 'r11'})
+                exchange_regs({'rdi': backup_reg})
             else:
                 bits = int(cmd[5:])
                 reg = reg_map[args[0]]
                 if reg == 'rcx':
                     exchange_regs({'rax': 'rcx', 'rcx': 'rax'})
                     reg = 'rax'
-                exchange_regs({'r11': 'rcx'})
+                exchange_regs({backup_reg: 'rcx'})
                 emit_load_imm('rcx', 'dq '+str(32-bits))
                 emit_unary_op('shl rax, cl', reg)
                 exchange_regs({'rdi': reg, reg: 'rdi'})
                 exchange_regs(None)
                 emit_instr('sar edi, cl')
-                exchange_regs({'rcx': 'r11'})
-                exchange_regs({'r11': 'rax'})
+                exchange_regs({'rcx': backup_reg})
+                exchange_regs({backup_reg: 'rax'})
                 exchange_regs(None)
                 emit_instr('movsxd rax, edi')
                 exchange_regs({'rdi': 'rax'})
-                exchange_regs({'rax': 'r11'})
+                exchange_regs({'rax': backup_reg})
                 exchange_regs({reg: 'rdi', 'rdi': reg})
                 if reg_map[args[0]] == 'rcx':
                     exchange_regs({'rax': 'rcx', 'rcx': 'rax'})

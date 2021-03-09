@@ -560,22 +560,22 @@ static void emit_addr(Node *node) {
 
 static void emit_copy_struct(Node *left, Node *right) {
     push("B");
-    push("C");
+    push("BP");
     emit_addr(right);
     push("A");
     emit_addr(left);
-    emit("mov C, A");
+    emit("mov BP, A");
     pop("A");
     emit("mov B, A");
     int i = 0;
     for (; i < left->ty->size; i++) {
         emit("load8 A, B");
-        emit("store8 A, C");
+        emit("store8 A, BP");
         emit("add B, 1");
-        emit("add C, 1");
+        emit("add BP, 1");
     }
     pop("A");
-    emit("mov C, A");
+    emit("mov BP, A");
     pop("A");
     emit("mov B, A");
 }
@@ -912,12 +912,12 @@ static void emit_call(Node *node) {
     char *end = make_label();
     if (isptr) {
         emit_expr(node->fptr);
-        emit("mov C, A");
+        emit("mov B, A");
     }
     emit("mov A, %s", end);
     push("A");
     if (isptr)
-        emit("jmp C");
+        emit("jmp B");
     else
         emit("jmp %s", node->fname);
     emit_label(end);
