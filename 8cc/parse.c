@@ -392,7 +392,8 @@ static Type* make_func_type(Type *rettype, Vector *paramtypes, bool has_varargs,
         .rettype = rettype,
         .params = paramtypes,
         .hasva = has_varargs,
-        .oldstyle = oldstyle });
+        .oldstyle = oldstyle,
+        .align = 1 });
 }
 
 static Type *make_stub_type() {

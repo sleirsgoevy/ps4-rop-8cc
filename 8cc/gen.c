@@ -1379,6 +1379,7 @@ static void emit_func_prologue(Node *func) {
         long long e;
         int size = v->ty->size;
         off -= size;
+        assert(v->ty->align);
         off &= -v->ty->align;
         v->loff = off;
     }
