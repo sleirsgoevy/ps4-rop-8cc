@@ -52,8 +52,10 @@ while True:
         s = eval('b'+arg)+b'\0'
         print('db', repr(list(s))[1:-1])
     elif l.startswith('nativecall '): # cdecl-to-x64 wrapper for external calls
-        assert l[11] == '_'
-        print('extern', l[12:])
+        name = l[11:]
+        if name.startswith('._native'): name = name[8:]
+        assert name[0] == '_', name
+        print('extern', name[1:])
         print(l[11:]+':')
         print('mov rdi, [rsp+8]')
         print('mov rsi, [rsp+16]')
@@ -62,7 +64,7 @@ while True:
         print('mov r8, [rsp+40]')
         print('mov r9, [rsp+48]')
         print('xor al, al')
-        print('call', l[12:])
+        print('call', name[1:])
         print('mov rcx, rax')
         print('ret')
     else:
@@ -149,10 +151,15 @@ while True:
         elif cmd in conds:
             assert args[0] not in ('SP', 'BP')
             reg_dst = reg_map[args[0]]
-            print('cmp %s, %s'%(reg_dst, reg_map[args[1]]))
+            print('cmp %s, %s'%(reg_dst, reg_map.get(args[1], args[1])))
             print('set%s %sl'%(conds[cmd], reg_dst[1]))
             print('movzx %s, %sl'%(reg_dst, reg_dst[1]))
         elif cmd.startswith('j') and cmd[1:] in conds:
             print('cmp %s, %s'%(reg_map[args[1]], reg_map.get(args[2], args[2])))
             print('j%s %s'%(conds[cmd[1:]], args[0]))
+        elif cmd in ('.byte', '.short', '.int', '.long', '.ptr'):
+            print({'.byte': 'db', '.short': 'dw', '.int': 'dd', '.long': 'dq', '.ptr': 'dq'}[cmd], args[0])
+        elif cmd == '.gadget_addr':
+            assert args[1].startswith('dq '), args[1]
+            print('mov %s, %s'%(reg_map[args[0]], args[1][3:]))
         else: assert False, l
