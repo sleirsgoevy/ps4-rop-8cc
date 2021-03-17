@@ -23,9 +23,16 @@ shift
 
 "$self/../8cc" "$self/../crt/crt_rop.c" -S -o "$temp/pp.s" || failure
 cat "$temp/pp.s" > "$temp/linked.s" || failure
+touch "$temp/custom.rop"
 
 while [ "x$1" != x ]
 do
+ii="$1"
+ll="${#ii}"
+ll="$((ll-4))"
+if [ "${ii:ll}" == ".rop" ]
+then cat "$ii" >> "$temp/custom.rop"
+else
 cat > "$temp/pp.c" << EOF
 unsigned short __builtin_bswap16(unsigned short);
 unsigned int __builtin_bswap32(unsigned int);
@@ -35,6 +42,7 @@ cpp -DPRINTF_DISABLE_SUPPORT_FLOAT '-D__asm__(...)=' '-D__restrict=' '-D__extens
 "$self/../8cc" "$temp/pp.c" -S -o "$temp/pp.s" || failure
 cat "$temp/pp.s" >> "$temp/linked.s" || failure
 echo >> "$temp/linked.s" || failure
+fi
 shift
 done
 cat >> "$temp/linked.rop" << EOF
@@ -58,6 +66,7 @@ stack_bottom:
 dp exit
 EOF
 python3 "$self/nativecalls.py" < "$temp/linked.s" | python3 "$self/s2rop.py" >> "$temp/linked.rop" || failure
+cat "$temp/custom.rop" >> "$temp/linked.rop"
 python3 "$self/rop2asm.py" < "$temp/linked.rop" > "$temp/linked.asm"
 yasm -f elf64 "$temp/linked.asm" -o "$out_o" || failure
 
